@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## v2 — 2026-10-31
+
+修 v1 的卡顿。用户反馈"去广告达到效果，但首页刷新、点进视频后评论区刷新很慢"，开关插件对比确认由插件引起。
+
+### 定位方法
+
+把每个被 `response-body-json-jq` 命中的端点按真实响应体体积排序。Loon 的 body 改写必须整包收完 → 解析 → 改写 → 再发出，期间不能流式返回，所以"匹配到的包越大、越靠前，体感越卡"。
+
+| 端点 | 体积 | 条目 | 实际广告 |
+|---|---|---|---|
+| `feed/index/relate/story` | **634 KB** | 20 | **0** |
+| `xlive/app-interface/v2/index/feed` | 479 KB | 24 | 1 |
+| `feed/index/story` | 233 KB | 6 | 2 |
+| `feed/index` | 212 KB | 10 | 0 |
+| `feed/index/story/cart` | 12 KB | — | 整包只有广告 |
+
+### 改动
+
+| # | 改动 | 原因 |
+|---|---|---|
+| 1 | `feed/index/relate/story` 的整包改写**默认关闭**（降为可选行） | 634 KB，每次进视频都拉，20 条里 0 条广告 —— 全插件最大的纯开销 |
+| 2 | `[MITM]` 去掉 `api.bilibili.com` | 该域名承载 `x/web-interface/view`（视频详情）、`x/player/wbi/playurl`（播放地址）、`x/kv-frontend/namespace/data`（页面配置，单份抓包被调 16 次）。为了拦一条广告上报而解密整条链路不划算 |
+| 3 | `x/vip/ads/material/report` 规则降为可选 | 它需要 `api.bilibili.com` 在 MITM 里，与第 2 条冲突 |
+| 4 | `[MITM]` 仅保留 `app.bilibili.com`、`api.live.bilibili.com` | 只解密真正要改的两个域名 |
+
+### 效果
+
+- 单次进视频页少改写 **634 KB**；首页刷新不再经过任何 `api.bilibili.com` 解密。
+- 去广告范围不变：开屏四条接口、首页广告卡、竖屏 story 广告、story 购物车锚点、直播首页轮播/活动卡、直播间 banner 与挂件、`cm.bilibili.com` 计费回传全部保留。
+- 真实响应回放验证：`feed/index` 10→10（零误删）、`feed/index/story` 6→4（精确删 2 条 `vertical_ad_av`）、`xlive/index/feed` 24→22、`relate/story` 不再命中。
+
+### 如果还想更快
+
+首页要极致顺滑可注释掉 D1（首页信息流改写）——广告卡会回来，但首页刷新彻底不走 body 改写。
+
 ## v1 — 2026-10-31
 
 首版。基于 iOS B站 `build 91601100` 的一份完整冷启动 + 首页/直播浏览抓包（1205 请求，1080 条带响应体）逐条核对字段写成。

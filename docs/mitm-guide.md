@@ -24,16 +24,19 @@ Loon 插件里的 `[Rewrite]` 只有在 **MITM 解密之后** 才能改写响应
 Loon → 配置 → 插件 → 右上角 `+` → 从 URL 添加：
 
 ```
-https://fastly.jsdelivr.net/gh/UserC23/bilibili-ads-loon@main/BilibiliAds.plugin
+https://fastly.jsdelivr.net/gh/UserC23/bilibili-ads-loon@COMMIT_SHA/BilibiliAds.plugin
 ```
 
 装完确认插件详情里能看到这几段：
 
 ```
-[MITM]     hostname = app.bilibili.com, api.bilibili.com, api.live.bilibili.com
-[Rewrite]  8 条（4 条 reject-dict + 4 条 response-body-json-jq）
+[MITM]     hostname = app.bilibili.com, api.live.bilibili.com
+[Rewrite]  7 条（3 条 reject-dict + 4 条 response-body-json-jq）
 [Rule]     DOMAIN,cm.bilibili.com,REJECT
 ```
+
+> v2 起 `api.bilibili.com` 不再出现在 `[MITM]` 里 —— 视频详情、播放地址、页面配置都不再解密，
+> 这是 v1 卡顿的主要原因之一。看到它没在里面**不是装错了**。
 
 然后 **上滑彻底杀掉 B站** 再重开。只切后台不生效，开屏和信息流都有本地缓存。
 

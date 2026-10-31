@@ -218,3 +218,47 @@ python tools/analyze_har.py 抓包.har --scan-ads
 1. 开屏只在**冷启动**请求 —— 录之前上滑杀掉 App。
 2. 信息流广告要多刷几页；`--feed` 里如果 `广告卡 0 / N`，说明这次没刷到，不是插件的问题。
 3. 录完先跑 `--check`，`有响应体` 为 0 就是 MITM 没解密，后面所有分析都没有意义。
+
+## 九、v2 性能分析：为什么砍掉 `relate/story`
+
+v1 上线后被反馈「去广告有效，但首页刷新、点进视频后评论区刷新很慢」，开关插件对比确认与插件相关。于是把每个被 `response-body-json-jq` 命中的端点按**真实响应体体积**排了一遍：
+
+| 端点 | 体积 | 条目 | 实际广告 |
+|---|---|---|---|
+| `/x/v2/feed/index/relate/story` | **634 KB** | 20 | **0** |
+| `/xlive/app-interface/v2/index/feed` | 479 KB | 24 | 1（`banner_v2`） |
+| `/x/v2/feed/index/story` | 233 KB | 6 | 2（`vertical_ad_av`） |
+| `/x/v2/feed/index` | 212 KB | 10 | 0（本次抓包） |
+| `/xlive/app-room/v1/index/getInfoByRoom` | 196 KB | — | 删字段 |
+| `/x/v2/feed/index/story/cart` | 12 KB | — | 整包只有一条广告锚点 |
+
+### 机制
+
+Loon 的 body 改写是整包处理：响应必须**全部收完** → 解析 JSON → 改写 → 重新发出。这条请求在改写完成前无法流式返回给 App。所以匹配到的响应越大、越靠近首屏，体感越卡。Loon 官方对 JSON 改写的建议是「2MB 以内 jq 开销可忽略」，也就是说代价主要不在 jq 计算，而在**整包缓冲**。
+
+`relate/story` 是相关推荐竖屏流的预加载，每次进视频必拉，634 KB 里 20 条内容 0 条广告 —— 改写它只有开销没有收益，v2 默认关闭。
+
+### MITM 范围
+
+v1 为了拦 `x/vip/ads/material/report`（一条广告上报，5 次请求，且全是明文 HTTP）把整个 `api.bilibili.com` 纳入 MITM。这个域名实际承载的是：
+
+| 接口 | 作用 | 抓包出现次数 |
+|---|---|---|
+| `x/kv-frontend/namespace/data` | 页面配置（表情、皮肤、功能开关） | 16 |
+| `open/monitor/apm/report` | 性能上报 | 6 |
+| `x/vip/ads/material/report` | 广告素材上报（要拦的目标） | 5 |
+| `x/player/wbi/playurl` | 播放地址 | 3 |
+| `x/web-interface/view` | 视频详情 | 1 |
+
+也就是 40 次解密里只有 5 次与广告有关，其中真正值得拦的只有这一条上报。v2 把 `api.bilibili.com` 移出 MITM，视频详情与播放地址不再经过解密；那条上报规则降为可选（要用需把域名加回 MITM）。
+
+### 验证
+
+用 v2 的规则回放原始抓包响应：
+
+| 端点 | 原始 | 改写后 | 结论 |
+|---|---|---|---|
+| `feed/index` | 10 条 | 10 条 | 零误删 |
+| `feed/index/story` | 6 条 | 4 条 | 精确删掉 2 条 `vertical_ad_av` |
+| `xlive/index/feed` | 24 张卡 | 22 张卡 | 删掉 `banner_v2` + `activity_card_v1` |
+| `feed/index/relate/story` | 20 条 | 20 条 | 未命中（零开销） |
