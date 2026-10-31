@@ -1,0 +1,28 @@
+# BilibiliAds.list
+# 哔哩哔哩 iOS 纯域名规则（Surge / Shadowrocket / Stash / Loon 的 [Rule] 段可直接用）
+#
+# 不含 MITM 与响应体改写。想要真正去掉开屏和首页广告卡，用仓库根目录的
+# BilibiliAds.plugin —— B站的广告靠接口下发，不靠第三方 SDK 域名，
+# 这里能拦的只是计费链路和几个外围 SDK。
+
+# ── 广告计费 / 转化回传（本次抓包 38 条请求全在这里）────────────────
+DOMAIN,cm.bilibili.com,REJECT
+
+# ── 大会员页广告上报 ────────────────────────────────────────────────
+# 接口是 api.bilibili.com/x/vip/ads/material/report，但 api.bilibili.com 同时
+# 承载登录态、播放地址、评论等主业务，域名级 REJECT 会整个 App 报废。
+# 域名规则表达不了"按路径拦"，这一条只能在 .plugin 里做。
+
+# ── 第三方广告 SDK（本抓包未出现，B站接入过，可开）──────────────────
+# DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT
+# DOMAIN-SUFFIX,pglstatp-toutiao.com,REJECT
+# DOMAIN-SUFFIX,ctobsnssdk.com,REJECT
+# DOMAIN-SUFFIX,gromore.com,REJECT
+# DOMAIN-SUFFIX,open.snssdk.com,REJECT
+# DOMAIN-SUFFIX,1rtb.com,REJECT
+
+# ── 明确不拦 ───────────────────────────────────────────────────────
+# grpc.biliapi.net        动态 / 搜索 / 热门 / 评论的主接口，拦了整个 App 半瘫
+# data.bilibili.com       埋点，不是广告，拦掉对去广告没有帮助
+# i0-i2.hdslb.com         封面图 CDN，广告图和正常封面混在一起
+# passport.bilibili.com   登录

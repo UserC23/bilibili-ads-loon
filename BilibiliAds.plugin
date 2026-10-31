@@ -1,0 +1,144 @@
+#!name=哔哩哔哩去广告 Pro
+#!desc=v1。基于 iOS B站 build 91601100 抓包（1205 请求）逐条核对字段写成：拦开屏广告（单次下发 83 条素材 / 1.7MB）、清首页信息流广告卡、竖屏 story 广告与购物车广告锚点、直播首页轮播与活动卡、直播间挂件与活动 banner，并掐掉广告计费上报。需开启 MITM 并信任证书。
+#!author=UserC23
+#!homepage=https://github.com/UserC23/bilibiliads-loon
+#!date=2026-10-31
+#!category=广告拦截
+
+# ─────────────────────────────────────────────────────────────
+# 这份规则不是"看到 ad 就删"，每一条都对过抓包里的真实字段。
+#
+# 抓包基线：iOS 哔哩哔哩 build 91601100，iPhone 17 Pro，iOS 27.0.1
+#          1205 条请求 / 1080 条带响应体 / 2026-10-31
+#
+# 三个最容易被写错的地方（也是网上多数 B站规则"装了没效果"的原因）
+#
+#   1. 开屏广告不在 app.bilibili.com/x/v2/splash 一条接口上，
+#      而是 list + show + brand/list + event/list2 四条。
+#      list 单次返回 83 条素材、1.7MB，只拦 show 不拦 list 等于没拦。
+#
+#   2. 首页信息流里【正常直播卡】也带 ad_info 字段：
+#        ad_info = {"resource":1890,"source":1891,"is_ad_loc":true,...}
+#      真广告卡才有 "is_ad": true 和 "creative_id"。
+#      按 ad_info 是否存在来删 —— 会把正常直播推全删掉。
+#      本插件只认 is_ad / creative_id / card_goto 前缀。
+#
+#   3. 竖屏 story 的广告卡是 card_goto = vertical_ad_av，
+#      而普通竖屏卡是 vertical_av。差一个 _ad_，正则写松了会误伤。
+#
+# 使用前提（缺一不可，否则插件一行都不执行）
+#   1. Loon 设置 → MitM → 打开开关
+#   2. 安装根证书，并在「设置 → 通用 → 关于本机 → 证书信任设置」开启完全信任
+#      （只在「VPN与设备管理」里安装、没去「证书信任设置」打开开关 = 没生效）
+#   3. B站上滑彻底杀掉后重开（页面 JSON 有缓存，切后台无效）
+# ─────────────────────────────────────────────────────────────
+
+[MITM]
+# cm.bilibili.com 走 [Rule] 直接 REJECT，不解密，所以不列在这里。
+hostname = app.bilibili.com, api.bilibili.com, api.live.bilibili.com
+
+[Rewrite]
+# ═════════════════════════════════════════════════════════════
+# A 级｜开屏广告 —— 默认开启
+# reject-dict 返回 HTTP 200 + {}，App 解析成「这轮没有开屏」，
+# 直接进首页。不会白屏，也不会弹网络异常。
+#
+# 四条接口缺一不可：
+#   list         素材清单（83 条 / 1.7MB，source=928，落地页多为京东/阿里妈妈）
+#   show         当天该展示哪一条（带 ad_cb 回执）
+#   brand/list   品牌开屏
+#   event/list2  开屏曝光事件
+#
+# 副作用：B站自己的节日开屏（春节/周年庆动画）也一起没了。
+# 这是开屏去广告的必然代价，介意就把这一段注释掉。
+# ═════════════════════════════════════════════════════════════
+^https?://app\.bilibili\.com/x/v2/splash/(list|show|brand/list|event/list2) reject-dict
+
+# ═════════════════════════════════════════════════════════════
+# B 级｜竖屏 story 购物车广告锚点 —— 默认开启
+# 这个接口整个响应体只有一条东西：data.anchor.ad_info，
+# 内容是「红果免费短剧」这类穿山甲（open.snssdk.com）下载广告。
+# 没有正常业务数据，所以整包拒绝最干净。
+# ═════════════════════════════════════════════════════════════
+^https?://app\.bilibili\.com/x/v2/feed/index/story/cart(\?|$) reject-dict
+
+# ═════════════════════════════════════════════════════════════
+# C 级｜广告计费与曝光上报 —— 默认开启
+# cm.bilibili.com 是 B站广告投放的计费/转化域名（本抓包 38 条请求）：
+#   /cm/api/conversion/mobile/v2   转化与点击回传（27 条，带 splashId/ad_cb/设备指纹）
+#   /cm/api/fees/wise              广告计费打点（11 条，event=show/video_play_3s）
+# 大会员页的素材上报也在 api.bilibili.com 上。
+#
+# 拦掉不会影响视频播放，只是广告主拿不到这条曝光。
+# ═════════════════════════════════════════════════════════════
+^https?://api\.bilibili\.com/x/vip/ads/material/report reject-dict
+^https?://api\.live\.bilibili\.com/xlive/play-interface/widgetService/GetWidgetBannerList reject-dict
+
+# ═════════════════════════════════════════════════════════════
+# D 级｜页面 JSON 清洗 —— 默认开启
+# 广告和正常内容在同一个 JSON 里，只能定点删，不能整包拒绝。
+# ═════════════════════════════════════════════════════════════
+
+# D1. 首页信息流（/x/v2/feed/index）
+#     删卡条件，任一命中：
+#       .is_ad == true                      显式广告标记
+#       .ad_info.is_ad == true              广告位广告标记
+#       .ad_info.creative_id > 0            有创意 ID = 有广告主
+#       card_goto / goto 命中 ^ad、_ad_、^vertical_ad
+#       card_type 命中 ^ad
+#
+#     刻意【不】按 .ad_info 是否存在来删：正常直播卡也有 ad_info（只有 is_ad_loc）。
+#     已用真实响应验证：这条规则跑完，10 条正常卡片一条不少，
+#     6 条竖屏卡里精确删掉 2 条 vertical_ad_av。
+^https?://app\.bilibili\.com/x/v2/feed/index(\?|$) response-body-json-jq 'del(.data.items[]? | select(((.is_ad? // false) == true) or ((.ad_info.is_ad? // false) == true) or ((.ad_info.creative_id? // 0) > 0) or (((.card_goto? // "") | tostring) | test("^ad|_ad_|^vertical_ad")) or (((.goto? // "") | tostring) | test("^ad|_ad_|^vertical_ad")) or (((.card_type? // "") | tostring) | test("^ad"))))'
+
+# D2. 竖屏 story（/x/v2/feed/index/story 与 /relate/story）
+#     广告卡特征：card_goto = vertical_ad_av + ad_info.creative_id。
+#     同一条表达式，靠 (\?|$) 与 D1 精确区分，不会互相串。
+^https?://app\.bilibili\.com/x/v2/feed/index/(story|relate/story)(\?|$) response-body-json-jq 'del(.data.items[]? | select(((.is_ad? // false) == true) or ((.ad_info.is_ad? // false) == true) or ((.ad_info.creative_id? // 0) > 0) or (((.card_goto? // "") | tostring) | test("^ad|_ad_|^vertical_ad")) or (((.goto? // "") | tostring) | test("^ad|_ad_|^vertical_ad")) or (((.card_type? // "") | tostring) | test("^ad"))))'
+
+# D3. 直播首页（/xlive/app-interface/v2/index/feed）
+#     本抓包 24 张卡，其中 2 张是广告/运营位：
+#       banner_v2          顶部轮播（5 帧，带 ad_order_id）
+#       activity_card_v1   活动卡
+#     另外 small_card_v1 里若 is_ad=true 也一并删。
+#     副作用：直播首页顶部轮播消失，属于运营位，不影响看播。
+^https?://api\.live\.bilibili\.com/xlive/app-interface/v2/index/feed(\?|$) response-body-json-jq 'del(.data.card_list[]? | select((((.card_type? // "") | tostring) == "banner_v2") or (((.card_type? // "") | tostring) == "activity_card_v1") or ((.card_data.small_card_v1.is_ad? // false) == true)))'
+
+# D4. 直播间信息（/xlive/app-room/v1/index/getInfoByRoom）
+#     activity_banner_info 里全是活动位：
+#       pendant_banner（号位 3615「假面奇妙夜」）/ top / bottom / superBanner …
+#     ad_livegame_info 是直播小游戏广告位。
+#     只删这两个字段，房间信息、榜单、礼物面板都不动。
+^https?://api\.live\.bilibili\.com/xlive/app-room/v1/index/getInfoByRoom(\?|$) response-body-json-jq 'del(.data.activity_banner_info) | del(.data.ad_livegame_info)'
+
+[Rule]
+# ═════════════════════════════════════════════════════════════
+# 域名级拦截
+# cm.bilibili.com 全域只有广告计费/转化，直接 REJECT 比解密后再改更省电。
+# ═════════════════════════════════════════════════════════════
+DOMAIN,cm.bilibili.com,REJECT
+
+# 本抓包未出现、但 B站接入的第三方广告 SDK（装了会更安静，按需打开）
+# DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT
+# DOMAIN-SUFFIX,pglstatp-toutiao.com,REJECT
+# DOMAIN-SUFFIX,ctobsnssdk.com,REJECT
+# DOMAIN-SUFFIX,gromore.com,REJECT
+# DOMAIN-SUFFIX,open.snssdk.com,REJECT
+# DOMAIN-SUFFIX,1rtb.com,REJECT
+
+# ═════════════════════════════════════════════════════════════
+# 高级｜默认关闭，按需打开
+# ═════════════════════════════════════════════════════════════
+
+# 1. 首页「运营大图」卡（card_goto = banner）。抓包里出现过 1 张，
+#    多为大会员/活动推广。删掉首页会更干净，但也可能删掉官方活动入口。
+# ^https?://app\.bilibili\.com/x/v2/feed/index(\?|$) response-body-json-jq 'del(.data.items[]? | select(((.card_goto? // "") | tostring) == "banner"))'
+
+# 2. 埋点上报（data.bilibili.com，本抓包 104 条）。
+#    不是广告，但占流量、也会把广告曝光一并上报。拦掉不影响观看。
+# DOMAIN,data.bilibili.com,REJECT
+
+# 3. 开屏素材图片（i0/i1/i2.hdslb.com 的 sycp_brand 目录）。
+#    开屏接口已经拒了，这条只是防止缓存里残留的素材继续占流量。
+# ^https?://i[0-9]\.hdslb\.com/bfs/sycp_brand/ reject-img
