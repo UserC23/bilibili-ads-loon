@@ -24,7 +24,7 @@ Loon 插件里的 `[Rewrite]` 只有在 **MITM 解密之后** 才能改写响应
 Loon → 配置 → 插件 → 右上角 `+` → 从 URL 添加：
 
 ```
-https://fastly.jsdelivr.net/gh/UserC23/bilibili-ads-loon@COMMIT_SHA/BilibiliAds.plugin
+https://fastly.jsdelivr.net/gh/UserC23/bilibili-ads-loon@83b871a04dc76eb1abee967ee26cda5af3d12402/BilibiliAds.plugin
 ```
 
 装完确认插件详情里能看到这几段：
