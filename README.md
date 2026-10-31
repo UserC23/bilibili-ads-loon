@@ -25,12 +25,12 @@ Loon → 设置 → **证书管理** → 生成并安装证书
 Loon → 配置 → 插件 → 右上角 `+` → 从 URL 添加：
 
 ```
-https://fastly.jsdelivr.net/gh/UserC23/bilibiliads-loon@main/BilibiliAds.plugin
+https://fastly.jsdelivr.net/gh/UserC23/bilibiliads-loon@4034572256a5c1cf30ad215e512cca72e739c5a4/BilibiliAds.plugin
 ```
 
 > 国内访问 `raw.githubusercontent.com` 一般不通，用上面的 jsDelivr 地址。
-> 如果装了新版本却毫无变化，改用固定 commit 地址（见文末「CDN 地址」），
-> jsDelivr 对 `@main` 有缓存。
+> 地址里那一串是**固定 commit**，不是 `@main` —— jsDelivr 对 `@main` 有缓存，
+> 改完规则可能还发旧版本给你。固定 SHA 是内容寻址的，永远拿到确切版本。
 
 ### 3. 彻底杀掉 App
 
@@ -119,13 +119,15 @@ python tools/analyze_har.py 抓包.har --scan-ads   # 定位广告字段的 JSON
 
 ## CDN 地址
 
-| 地址 | 实测 |
+| 地址 | 说明 |
 |---|---|
-| `fastly.jsdelivr.net/gh/UserC23/bilibiliads-loon@<commit>/BilibiliAds.plugin` | ✅ 推荐，内容寻址，永远拿到确切版本 |
-| `gcore.jsdelivr.net/gh/UserC23/bilibiliads-loon@<commit>/BilibiliAds.plugin` | ✅ |
+| `fastly.jsdelivr.net/gh/UserC23/bilibiliads-loon@4034572/BilibiliAds.plugin` | ✅ 推荐，内容寻址 |
+| `gcore.jsdelivr.net/gh/UserC23/bilibiliads-loon@4034572/BilibiliAds.plugin` | ✅ 备用节点 |
 | `ghproxy.net/https://raw.githubusercontent.com/UserC23/bilibiliads-loon/main/BilibiliAds.plugin` | ✅ 实时，依赖第三方代理 |
 | `...@main/BilibiliAds.plugin` | ⚠ 有 CDN 缓存，改完规则可能还拿到旧版本 |
 | `raw.githubusercontent.com/...` | ❌ 国内直连不通 |
+
+更新版本时，`git log --format=%H -1` 拿到新 commit，把上面的 `4034572` 换掉即可。
 
 ---
 
