@@ -1,7 +1,7 @@
 #!name=哔哩哔哩去广告 Pro
 #!desc=v1。基于 iOS B站 build 91601100 抓包（1205 请求）逐条核对字段写成：拦开屏广告（单次下发 83 条素材 / 1.7MB）、清首页信息流广告卡、竖屏 story 广告与购物车广告锚点、直播首页轮播与活动卡、直播间挂件与活动 banner，并掐掉广告计费上报。需开启 MITM 并信任证书。
 #!author=UserC23
-#!homepage=https://github.com/UserC23/bilibiliads-loon
+#!homepage=https://github.com/UserC23/bilibili-ads-loon
 #!date=2026-10-31
 #!category=广告拦截
 

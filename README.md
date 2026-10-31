@@ -1,4 +1,4 @@
-# bilibiliads-loon
+# bilibili-ads-loon
 
 哔哩哔哩 iOS 去广告 Loon 插件。
 
@@ -25,7 +25,7 @@ Loon → 设置 → **证书管理** → 生成并安装证书
 Loon → 配置 → 插件 → 右上角 `+` → 从 URL 添加：
 
 ```
-https://fastly.jsdelivr.net/gh/UserC23/bilibiliads-loon@4034572256a5c1cf30ad215e512cca72e739c5a4/BilibiliAds.plugin
+https://fastly.jsdelivr.net/gh/UserC23/bilibili-ads-loon@4034572256a5c1cf30ad215e512cca72e739c5a4/BilibiliAds.plugin
 ```
 
 > 国内访问 `raw.githubusercontent.com` 一般不通，用上面的 jsDelivr 地址。
@@ -121,9 +121,9 @@ python tools/analyze_har.py 抓包.har --scan-ads   # 定位广告字段的 JSON
 
 | 地址 | 说明 |
 |---|---|
-| `fastly.jsdelivr.net/gh/UserC23/bilibiliads-loon@4034572/BilibiliAds.plugin` | ✅ 推荐，内容寻址 |
-| `gcore.jsdelivr.net/gh/UserC23/bilibiliads-loon@4034572/BilibiliAds.plugin` | ✅ 备用节点 |
-| `ghproxy.net/https://raw.githubusercontent.com/UserC23/bilibiliads-loon/main/BilibiliAds.plugin` | ✅ 实时，依赖第三方代理 |
+| `fastly.jsdelivr.net/gh/UserC23/bilibili-ads-loon@4034572/BilibiliAds.plugin` | ✅ 推荐，内容寻址 |
+| `gcore.jsdelivr.net/gh/UserC23/bilibili-ads-loon@4034572/BilibiliAds.plugin` | ✅ 备用节点 |
+| `ghproxy.net/https://raw.githubusercontent.com/UserC23/bilibili-ads-loon/main/BilibiliAds.plugin` | ✅ 实时，依赖第三方代理 |
 | `...@main/BilibiliAds.plugin` | ⚠ 有 CDN 缓存，改完规则可能还拿到旧版本 |
 | `raw.githubusercontent.com/...` | ❌ 国内直连不通 |
 
